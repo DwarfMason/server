@@ -5037,7 +5037,7 @@ make_join_statistics(JOIN *join, List<TABLE_LIST> &tables_list,
     }
   }
 
-  if (thd->trace_started())
+  if (unlikely(thd->trace_started()))
     trace_table_dependencies(thd, stat, join->table_count);
 
   if (join->conds || outer_join)
@@ -5363,6 +5363,7 @@ make_join_statistics(JOIN *join, List<TABLE_LIST> &tables_list,
         s->found_records= s->records= 1;
         s->read_time=1.0;
         s->worst_seeks=1.0;
+        if (unlikely(thd->trace_started()))
         table_records.add_table_name(s)
                      .add("rows", s->found_records)
                      .add("cost", s->read_time)
@@ -11875,9 +11876,12 @@ make_join_select(JOIN *join,SQL_SELECT *select,COND *cond)
       if (!tab->table)
        continue;
       Item *const cond = tab->select_cond;
-      Json_writer_object trace_one_table(thd);
-      trace_one_table.add_table_name(tab);
-      trace_one_table.add("attached", cond);
+      if (unlikely(thd->trace_started()))
+      {
+        Json_writer_object trace_one_table(thd);
+        trace_one_table.add_table_name(tab);
+        trace_one_table.add("attached", cond);
+      }
     }
   }
   DBUG_RETURN(0);
@@ -28035,10 +28039,13 @@ test_if_cheaper_ordering(const JOIN_TAB *tab, ORDER *order, TABLE *table,
     set_if_bigger(refkey_rows_estimate, 1);
   }
 
-  if (tab)
-    trace_cheaper_ordering.add_table_name(tab);
-  else
-    trace_cheaper_ordering.add_table_name(table);
+  if (unlikely(thd->trace_started()))
+  {
+    if (tab)
+      trace_cheaper_ordering.add_table_name(tab);
+    else
+      trace_cheaper_ordering.add_table_name(table);
+  }
   trace_cheaper_ordering.add("rows_estimation", refkey_rows_estimate);
 
   Json_writer_array possible_keys(thd,"possible_keys");

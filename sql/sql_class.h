@@ -2805,6 +2805,8 @@ public:
   }
 
   ulonglong  limit_found_rows;
+  bool trace_start; // initialize this to false in constructor and never touch it 
+  inline bool trace_started() const { return trace_start; }
 
 private:
   /**
@@ -3274,7 +3276,6 @@ public:
   void reset_for_reuse();
   bool store_globals();
   void reset_globals();
-  bool trace_started();
 #ifdef SIGNAL_WITH_VIO_CLOSE
   inline void set_active_vio(Vio* vio)
   {

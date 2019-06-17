@@ -630,6 +630,8 @@ void Json_writer::add_table_name(const TABLE *table)
 
 void add_table_scan_values_to_trace(THD *thd, JOIN_TAB *tab)
 {
+  if (likely(!thd->trace_started()))
+    return;
   Json_writer_object table_records(thd);
   table_records.add_table_name(tab);
   Json_writer_object table_rec(thd, "table_scan");

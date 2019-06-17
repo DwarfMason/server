@@ -867,6 +867,7 @@ THD::THD(my_thread_id id, bool is_wsrep_applier)
   create_tmp_table_for_derived= FALSE;
   save_prep_leaf_list= FALSE;
   org_charset= 0;
+  trace_start= FALSE;
   /* Restore THR_THD */
   set_current_thd(old_THR_THD);
 }
@@ -2203,11 +2204,6 @@ void THD::reset_globals()
   /* Undocking the thread specific data. */
   set_current_thd(0);
   net.thd= 0;
-}
-
-bool THD::trace_started()
-{
-  return opt_trace.is_started();
 }
 
 /*

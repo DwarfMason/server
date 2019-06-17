@@ -327,7 +327,7 @@ protected:
   bool closed;
 
 public:
-  explicit Json_writer_struct(THD *thd)
+  inline Json_writer_struct(THD *thd)
   {
     my_writer= thd->opt_trace.get_current_json();
     context.init(my_writer);
@@ -353,8 +353,17 @@ private:
       my_writer->add_member(name);
   }
 public:
-  explicit Json_writer_object(THD *thd);
-  explicit Json_writer_object(THD *thd, const char *str);
+  inline Json_writer_object(THD *thd):Json_writer_struct(thd)
+  {
+    if (my_writer)
+      my_writer->start_object();
+  }
+
+  inline Json_writer_object(THD *thd, const char *str):Json_writer_struct(thd)
+  {
+    if (my_writer)
+      my_writer->add_member(str).start_object();
+  }
 
   Json_writer_object& add(const char *name, bool value)
   {
@@ -458,7 +467,12 @@ public:
       my_writer->end_object();
     closed= TRUE;
   }
-  ~Json_writer_object();
+  inline ~Json_writer_object()
+  {
+    if (!closed && my_writer)
+      my_writer->end_object();
+    closed= TRUE;
+  }
 };
 
 
@@ -473,8 +487,16 @@ public:
 class Json_writer_array : public Json_writer_struct
 {
 public:
-  Json_writer_array(THD *thd);
-  Json_writer_array(THD *thd, const char *str);
+  inline Json_writer_array(THD *thd):Json_writer_struct(thd)
+  {
+    if (my_writer)
+      my_writer->start_array();
+  }
+  inline Json_writer_array(THD *thd, const char *str):Json_writer_struct(thd)
+  {
+    if (my_writer)
+      my_writer->add_member(str).start_array();
+  }
   void end()
   {
     DBUG_ASSERT(!closed);
@@ -557,7 +579,14 @@ public:
     context.add_table_name(table);
     return *this;
   }
-  ~Json_writer_array();
+  inline ~Json_writer_array()
+  {
+    if (!closed && my_writer)
+    {
+      my_writer->end_array();
+      closed= TRUE;
+    }
+  }
 };
 
 /*
