@@ -45,6 +45,7 @@
 #include <hash.h>
 #include <stdarg.h>
 #include <violite.h>
+#include <expr_parser.cc>
 #define PCRE2_STATIC 1  /* Important on Windows */
 #include "pcre2posix.h" /* pcreposix regex library */
 #ifdef HAVE_SYS_WAIT_H
@@ -6136,7 +6137,7 @@ int do_done(struct st_command *command)
   return 0;
 }
 
-/* Operands available in if or while conditions */
+/* Operands available in if or while conditions *//*
 
 enum block_op {
   EQ_OP,
@@ -6153,7 +6154,7 @@ enum block_op find_operand(const char *start)
 {
  char first= *start;
  char next= *(start+1);
- 
+
  if (first == '=' && next == '=')
    return EQ_OP;
  if (first == '!' && next == '=')
@@ -6166,10 +6167,82 @@ enum block_op find_operand(const char *start)
    return LE_OP;
  if (first == '<')
    return LT_OP;
- 
- return ILLEG_OP;
-}
 
+ return ILLEG_OP;
+}*/
+
+int evaluate_expression(var_node* expr){
+  int left = 0;
+  int right = 0;
+  int ans = 0;
+  switch (expr->type) {
+    case BINARY_NODE:
+      left = evaluate_expression(expr->left);
+      right = evaluate_expression(expr->right);
+      free(expr->left);
+      free(expr->right);
+      switch (expr->op_type) {
+        case EQ_OP:
+          ans = left == right;
+          break;
+        case NE_OP:
+          ans = left != right;
+          break;
+        case GT_OP:
+          ans = left > right;
+          break;
+        case GE_OP:
+          ans = left >= right;
+          break;
+        case LT_OP:
+          ans = left < right;
+          break;
+        case LE_OP:
+          ans = left <= right;
+          break;
+        case PLUS_OP:
+          ans = left + right;
+          break;
+        case MINUS_OP:
+          ans = left - right;
+          break;
+        case DIV_OP:
+          ans = left / right;
+          break;
+        case MOD_OP:
+          ans = left % right;
+          break;
+        case MUL_OP:
+          ans = left * right;
+          break;
+        default:
+          die("Found illegal operator");
+      }
+      break;
+    case UNARY_NODE:
+      left = evaluate_expression(expr->left);
+      free(expr->left);
+      switch (expr->op_type) {
+        case UNARY_MINUS_OP:
+          ans = -left;
+          break;
+        case UNARY_NOT_OP:
+          ans = !left;
+          break;
+        default:
+          die("Found illegal operator");
+      }
+      break;
+    case ID_NODE:
+      ans = var_get(expr->var_name, nullptr, 0, 0)->int_val;
+      free(expr->var_name);
+      break;
+    case NUM_NODE:
+      ans = expr->value;
+      break;
+  }
+  return ans;
+}
 
 /*
   Process start of a "if" or "while" statement
@@ -6204,13 +6277,12 @@ enum block_op find_operand(const char *start)
   == and != can be used for strings, all can be used for numerical values.
 */
 
-void do_block(enum block_cmd cmd, struct st_command* command)
-{
-  char *p= command->first_argument;
+void do_block(enum block_cmd cmd, struct st_command* command) {
+  char *p = command->first_argument;
   const char *expr_start, *expr_end;
   VAR v;
-  const char *cmd_name= (cmd == cmd_while ? "while" : "if");
-  my_bool not_expr= FALSE;
+  const char *cmd_name = (cmd == cmd_while ? "while" : "if");
+  //my_bool not_expr= FALSE;
   DBUG_ENTER("do_block");
   DBUG_PRINT("enter", ("%s", cmd_name));
 
@@ -6219,57 +6291,51 @@ void do_block(enum block_cmd cmd, struct st_command* command)
     die("Nesting too deeply");
 
   /* Set way to find outer block again, increase line counter */
-  cur_block->line= parser.current_line++;
+  cur_block->line = parser.current_line++;
 
   /* If this block is ignored */
-  if (!cur_block->ok)
-  {
+  if (!cur_block->ok) {
     /* Inner block should be ignored too */
     cur_block++;
-    cur_block->cmd= cmd;
-    cur_block->ok= FALSE;
-    cur_block->delim[0]= '\0';
+    cur_block->cmd = cmd;
+    cur_block->ok = FALSE;
+    cur_block->delim[0] = '\0';
     DBUG_VOID_RETURN;
   }
 
   /* Parse and evaluate test expression */
-  expr_start= strchr(p, '(');
+  expr_start = strchr(p, '(');
   if (!expr_start++)
     die("missing '(' in %s", cmd_name);
+  const char *expr_start_eval = expr_start;
 
   while (my_isspace(charset_info, *expr_start))
     expr_start++;
-  
-  /* Check for !<expr> */
-  if (*expr_start == '!')
-  {
-    not_expr= TRUE;
-    expr_start++; /* Step past the '!', then any whitespace */
-    while (*expr_start && my_isspace(charset_info, *expr_start))
-      expr_start++;
-  }
+
+
   /* Find ending ')' */
-  expr_end= strrchr(expr_start, ')');
+  expr_end = strrchr(expr_start, ')');
   if (!expr_end)
     die("missing ')' in %s", cmd_name);
-  p= (char*)expr_end+1;
+  const char *expr_end_eval = expr_end;
+  p = (char *) expr_end + 1;
 
   while (*p && my_isspace(charset_info, *p))
     p++;
   if (*p && *p != '{')
     die("Missing '{' after %s. Found \"%s\"", cmd_name, p);
 
-  var_init(&v,0,0,0,0);
+  var_init(&v, 0, 0, 0, 0);
 
   /* If expression starts with a variable, it may be a compare condition */
 
-  if (*expr_start == '$')
+  /*if (*expr_start == '$')
   {
     const char *curr_ptr= expr_end;
     eval_expr(&v, expr_start, &curr_ptr, true);
     while (my_isspace(charset_info, *++curr_ptr))
     {}
-    /* If there was nothing past the variable, skip condition part */
+    *//* If there was nothing past the variable, skip condition part *//*
     if (curr_ptr == expr_end)
       goto NO_COMPARE;
 
@@ -6278,11 +6344,11 @@ void do_block(enum block_cmd cmd, struct st_command* command)
       die("Found junk '%.*b' after $variable in condition",
           (int)(expr_end - curr_ptr), curr_ptr);
 
-    /* We could silently allow this, but may be confusing */
+    *//* We could silently allow this, but may be confusing *//*
     if (not_expr)
       die("Negation and comparison should not be combined, please rewrite");
     
-    /* Skip the 1 or 2 chars of the operand, then white space */
+    *//* Skip the 1 or 2 chars of the operand, then white space *//*
     if (operand == LT_OP || operand == GT_OP)
     {
       curr_ptr++;
@@ -6296,10 +6362,10 @@ void do_block(enum block_cmd cmd, struct st_command* command)
     if (curr_ptr == expr_end)
       die("Missing right operand in comparison");
 
-    /* Strip off trailing white space */
+    *//* Strip off trailing white space *//*
     while (my_isspace(charset_info, expr_end[-1]))
       expr_end--;
-    /* strip off ' or " around the string */
+    *//* strip off ' or " around the string *//*
     if (*curr_ptr == '\'' || *curr_ptr == '"')
     {
       if (expr_end[-1] != *curr_ptr)
@@ -6314,7 +6380,7 @@ void do_block(enum block_cmd cmd, struct st_command* command)
     if ((operand!=EQ_OP && operand!=NE_OP) && ! (v.is_int && v2.is_int))
       die("Only == and != are supported for string values");
 
-    /* Now we overwrite the first variable with 0 or 1 (for false or true) */
+    *//* Now we overwrite the first variable with 0 or 1 (for false or true) *//*
 
     switch (operand)
     {
@@ -6350,14 +6416,21 @@ void do_block(enum block_cmd cmd, struct st_command* command)
 
     v.is_int= TRUE;
     var_free(&v2);
-  } else
-  {
-    if (*expr_start != '`' && ! my_isdigit(charset_info, *expr_start))
-      die("Expression in if/while must beging with $, ` or a number");
+  }*/
+
+  if (*expr_start == '`')
     eval_expr(&v, expr_start, &expr_end);
+  else
+  {
+    char *expr_str = (char *) malloc(expr_end_eval - expr_start_eval);
+    strncpy(expr_str, expr_start_eval, expr_end_eval - expr_start_eval);
+    var_node *expr = parse_expr(expr_str);
+    v.int_val = evaluate_expression(expr);
+    free(expr);
+    free(expr_str);
+    v.is_int = true;
   }
 
- NO_COMPARE:
   /* Define inner block */
   cur_block++;
   cur_block->cmd= cmd;
@@ -6374,9 +6447,6 @@ void do_block(enum block_cmd cmd, struct st_command* command)
 
     cur_block->ok= (*p && *p != '0') ? TRUE : FALSE;
   }
-  
-  if (not_expr)
-    cur_block->ok = !cur_block->ok;
 
   if (cur_block->ok) 
   {

@@ -44,9 +44,22 @@ IF(UNIX)
   SET_TARGET_PROPERTIES(mariadb PROPERTIES ENABLE_EXPORTS TRUE)
 ENDIF(UNIX)
 
+
+FIND_PACKAGE(FLEX REQUIRED)
+FIND_PACKAGE(BISON REQUIRED)
+
+flex_target(expr-lexer mysqltest-expr.lex "${CMAKE_CURRENT_BINARY_DIR}/expr_lexer.cc")
+bison_target(expr-parser mysqltest-expr.y "${CMAKE_CURRENT_BINARY_DIR}/expr_parser.cc")
+ADD_FLEX_BISON_DEPENDENCY(expr-lexer expr-parser)
+
+add_library(mysqltest-expr
+        "${CMAKE_CURRENT_BINARY_DIR}/expr_lexer.cc"
+        "${CMAKE_CURRENT_BINARY_DIR}/expr_parser.cc"
+        )
+
 MYSQL_ADD_EXECUTABLE(mariadb-test mysqltest.cc ${CMAKE_SOURCE_DIR}/sql/sql_string.cc COMPONENT Test)
 SET_SOURCE_FILES_PROPERTIES(mysqltest.cc PROPERTIES COMPILE_FLAGS "-DTHREADS ${PCRE2_DEBIAN_HACK}")
-TARGET_LINK_LIBRARIES(mariadb-test  ${CLIENT_LIB} pcre2-posix pcre2-8)
+TARGET_LINK_LIBRARIES(mariadb-test  ${CLIENT_LIB} pcre2-posix pcre2-8 mysqltest-expr)
 SET_TARGET_PROPERTIES(mariadb-test PROPERTIES ENABLE_EXPORTS TRUE)
 
 

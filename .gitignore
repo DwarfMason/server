@@ -41,6 +41,9 @@ client/mysqlshow
 client/mysqlslap
 client/mysqltest
 client/mariadb-conv
+client/expr_lexer.cc
+client/expr_parser.cc
+client/expr_parser.hh
 cmake_install.cmake
 dbug/*.r
 dbug/factorial

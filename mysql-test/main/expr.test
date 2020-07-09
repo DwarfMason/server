@@ -1,0 +1,15 @@
+#
+# MDEV-12130 improve mysqltest language
+#
+# add proper expression support
+#
+
+# While
+
+let $cnt=4;
+
+while ($cnt > 2 + 8 - 8)
+{
+  dec $cnt;
+  --echo $cnt
+}
